@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard for AI Tools</title>
+    <title>Dashboard for AI tools - Content Generation</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,7 +36,6 @@
     <div id="message-container"></div>
     <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-4xl transform transition-all duration-300 hover:scale-105">
         <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Dashboard for AI tools - Content Generation</h1>
-        <p class="text-gray-500 mb-6 text-center text-sm">This tool requires a web server to function correctly due to browser security policies.</p>
 
         <div class="space-y-4">
             <!-- API Key Input -->
@@ -53,20 +52,13 @@
                     <option value="gemini-image">Gemini (Image)</option>
                     <option value="chatgpt">ChatGPT (Text)</option>
                     <option value="dall-e">DALL-E (Image)</option>
-                    <option value="stabilityai">Stability AI (Video)</option>
-                    <option value="stable-audio">Stability AI (Audio)</option>
                 </select>
             </div>
             
-            <!-- Prompt and Image Inputs (dynamically shown/hidden) -->
-            <div id="prompt-div">
+            <!-- Prompt Input -->
+            <div>
                 <label for="prompt-input" class="block text-sm font-medium text-gray-700">Enter your prompt:</label>
                 <textarea id="prompt-input" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 transition duration-150 ease-in-out" placeholder="Type your prompt here..."></textarea>
-            </div>
-            
-            <div id="image-url-div" class="hidden">
-                <label for="image-url-input" class="block text-sm font-medium text-gray-700">Enter image URL:</label>
-                <input type="text" id="image-url-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 transition duration-150 ease-in-out" placeholder="Paste a publicly accessible image URL">
             </div>
 
             <button id="generate-btn" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
@@ -97,12 +89,9 @@
             const aiToolSelect = document.getElementById('ai-tool');
             const apiKeyInput = document.getElementById('api-key');
             
-            const imageURLDiv = document.getElementById('image-url-div');
-            const imageURLInput = document.getElementById('image-url-input');
-
             const messageContainer = document.getElementById('message-container');
 
-            // Function to show a temporary message to the user
+            // Show a temporary message to the user
             const showMessage = (text, type = 'info') => {
                 const message = document.createElement('div');
                 message.className = `message-box show text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
@@ -115,18 +104,8 @@
                 }, 3000);
             };
 
-            // Event listener to toggle visibility of image URL input based on tool selection
-            aiToolSelect.addEventListener('change', () => {
-                const selectedTool = aiToolSelect.value;
-                if (selectedTool === 'stabilityai') {
-                    imageURLDiv.classList.remove('hidden');
-                } else {
-                    imageURLDiv.classList.add('hidden');
-                }
-            });
-
             // This function handles the API calls
-            const generateContent = async (tool, prompt, apiKey, imageUrl) => {
+            const generateContent = async (tool, prompt, apiKey) => {
                 // Set loading state
                 buttonText.textContent = 'Generating...';
                 loadingSpinner.classList.remove('hidden');
@@ -134,20 +113,11 @@
                 outputArea.innerHTML = '';
 
                 try {
-                    if (!apiKey && tool !== 'gemini' && tool !== 'gemini-image') {
-                        throw new Error('Please enter your API Key.');
-                    }
-                    if (tool === 'gemini' && apiKey === '') {
-                        // For Gemini, the API key is handled by the platform, so we'll just proceed
-                        // with an empty string if the user hasn't entered one.
-                        // No-op.
-                    }
-
                     let response;
                     let result;
 
                     if (tool === 'gemini') {
-                         const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                         const geminiApiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + apiKey;
                          const payload = {
                              contents: [{ parts: [{ text: prompt }] }]
                          };
@@ -157,12 +127,10 @@
                              headers: { 'Content-Type': 'application/json' },
                              body: JSON.stringify(payload)
                          });
-
                          if (!response.ok) {
                             const errorResponseText = await response.text();
                             throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
                          }
-
                          result = await response.json();
                          
                          if (result.candidates && result.candidates.length > 0) {
@@ -188,12 +156,10 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
                         });
-
                         if (!response.ok) {
                             const errorResponseText = await response.text();
                             throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
                          }
-                        
                         result = await response.json();
                         
                         if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
@@ -206,7 +172,8 @@
                         } else {
                             throw new Error('No image was returned from the Gemini API.');
                         }
-                    } else if (tool === 'chatgpt') {
+                    }
+                    else if (tool === 'chatgpt') {
                         const chatgptApiUrl = 'https://api.openai.com/v1/chat/completions';
                         const payload = {
                             model: "gpt-3.5-turbo",
@@ -223,9 +190,8 @@
                         if (!response.ok) {
                             const errorResponseText = await response.text();
                             throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
-                        }
+                         }
                         result = await response.json();
-                        console.log("Raw API Response:", result);
 
                         if (result.choices && result.choices.length > 0) {
                             const text = result.choices[0].message.content;
@@ -252,9 +218,8 @@
                         if (!response.ok) {
                             const errorResponseText = await response.text();
                             throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
-                        }
+                         }
                         result = await response.json();
-                        console.log("Raw API Response:", result);
                         
                         if (result.data && result.data.length > 0) {
                             const imageUrl = result.data[0].url;
@@ -266,97 +231,13 @@
                         } else {
                             throw new Error('Invalid response from DALL-E.');
                         }
-                    } else if (tool === 'stabilityai') {
-                        if (!imageUrl) {
-                            throw new Error('Please enter an image URL for video generation.');
-                        }
-                        
-                        const stabilityApiUrl = 'https://api.fal.ai/models/fal-ai/fast-svd/image-to-video/generate';
-                        const payload = {
-                            input: {
-                                image_url: imageUrl,
-                                prompt: prompt,
-                                motion_bucket_id: 127,
-                                fps: 10,
-                                frames: 25
-                            }
-                        };
-                        
-                        showMessage('Generating video with Stable Video Diffusion. This may take a few minutes...', 'info');
-
-                        response = await fetch(stabilityApiUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${apiKey}`
-                            },
-                            body: JSON.stringify(payload)
-                        });
-                        if (!response.ok) {
-                            const errorResponseText = await response.text();
-                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
-                        }
-                        result = await response.json();
-                        
-                        if (result.video?.url) {
-                            const video = document.createElement('video');
-                            video.src = result.video.url;
-                            video.controls = true;
-                            video.className = "w-full rounded-md shadow-md";
-                            outputArea.innerHTML = '';
-                            outputArea.appendChild(video);
-                        } else {
-                            throw new Error('Invalid or incomplete response from Stability AI API. Check your API key and image URL.');
-                        }
-                    } else if (tool === 'stable-audio') {
-                        const stableAudioApiUrl = 'https://api.fal.ai/models/fal-ai/stable-audio/generate';
-                        const payload = {
-                            input: {
-                                prompt: prompt,
-                                duration: 15
-                            }
-                        };
-
-                        showMessage('Generating audio with Stability AI via Fal.ai. This may take a few moments...', 'info');
-
-                        response = await fetch(stableAudioApiUrl, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${apiKey}`
-                            },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (!response.ok) {
-                            const errorResponseText = await response.text();
-                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
-                        }
-
-                        result = await response.json();
-                        
-                        if (result.audio_url) {
-                            const audio = document.createElement('audio');
-                            audio.src = result.audio_url;
-                            audio.controls = true;
-                            audio.className = "w-full rounded-md shadow-md";
-                            outputArea.innerHTML = '';
-                            outputArea.appendChild(audio);
-                        } else {
-                            throw new Error('Invalid or incomplete response from Stability AI Audio API.');
-                        }
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    // Add a more user-friendly error message for fetch failures
-                    if (error.message.includes("Failed to fetch")) {
-                        outputArea.textContent = `Error: Failed to connect to the API. This is likely due to a browser security policy (CORS). This tool needs to be hosted on a web server to work correctly with non-Gemini APIs.`;
-                        showMessage('Connection failed. Likely a CORS error.', 'error');
-                    } else {
-                        outputArea.textContent = `Error: ${error.message}`;
-                        showMessage(error.message, 'error');
-                    }
+                    outputArea.textContent = `Error: ${error.message}`;
+                    showMessage(error.message, 'error');
                 } finally {
+                    // Reset loading state
                     buttonText.textContent = 'Generate Output';
                     loadingSpinner.classList.add('hidden');
                     generateBtn.disabled = false;
@@ -368,19 +249,13 @@
                 const prompt = promptInput.value.trim();
                 const selectedTool = aiToolSelect.value;
                 const apiKey = apiKeyInput.value.trim();
-                const imageUrl = imageURLInput.value.trim();
 
-                if (prompt === '' && selectedTool !== 'stabilityai') {
+                if (prompt === '') {
                     showMessage('Please enter a prompt.', 'error');
                     return;
                 }
-
-                if (selectedTool === 'stabilityai' && imageUrl === '') {
-                    showMessage('Please enter an image URL for video generation.', 'error');
-                    return;
-                }
                 
-                generateContent(selectedTool, prompt, apiKey, imageUrl);
+                generateContent(selectedTool, prompt, apiKey);
             });
         });
     </script>

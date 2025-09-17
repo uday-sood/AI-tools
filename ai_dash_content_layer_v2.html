@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard for AI tools - Content Generation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="worker-src * 'unsafe-inline' 'unsafe-eval'; img-src * blob: data:; media-src *">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 2rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: none;
+            text-align: center;
+        }
+        .message-box.show {
+            display: block;
+        }
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-6 flex items-center justify-center min-h-screen">
+
+    <div id="message-container"></div>
+    <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-4xl transform transition-all duration-300 hover:scale-105">
+        <h1 class="text-3xl font-bold text-gray-800 mb-6 text-center">Dashboard for AI tools - Content Generation</h1>
+
+        <div class="space-y-4">
+            <!-- API Key Input -->
+            <div>
+                <label for="api-key" class="block text-sm font-medium text-gray-700">API Key:</label>
+                <input type="password" id="api-key" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 transition duration-150 ease-in-out" placeholder="Enter your key here">
+            </div>
+
+            <!-- Tool Selection -->
+            <div>
+                <label for="ai-tool" class="block text-sm font-medium text-gray-700">Select AI Tool:</label>
+                <select id="ai-tool" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm transition duration-150 ease-in-out">
+                    <option value="gemini">Gemini (Text)</option>
+                    <option value="gemini-image">Gemini (Image)</option>
+                    <option value="gemini-image-edit">Gemini (Image Edit)</option>
+                    <option value="chatgpt">ChatGPT (Text)</option>
+                    <option value="dall-e">DALL-E (Image)</option>
+                </select>
+            </div>
+            
+            <!-- Prompt Input -->
+            <div>
+                <label for="prompt-input" class="block text-sm font-medium text-gray-700">Enter your prompt:</label>
+                <textarea id="prompt-input" rows="5" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-3 transition duration-150 ease-in-out" placeholder="Type your prompt here..."></textarea>
+            </div>
+
+            <div class="flex space-x-2">
+                <button id="send-btn" class="flex-1 flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out">
+                    <span id="button-text">Send</span>
+                    <svg id="loading-spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+                <button id="reset-btn" class="flex-1 flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition duration-150 ease-in-out">
+                    Reset Conversation
+                </button>
+            </div>
+             <p id="chat-status" class="text-sm text-gray-500 mt-2 text-center"></p>
+        </div>
+
+        <!-- Output Section -->
+        <div class="mt-8">
+            <h2 class="text-xl font-semibold text-gray-800 mb-2">Generated Output:</h2>
+            <div id="output-area" class="bg-gray-50 border border-gray-200 rounded-md p-4 min-h-[100px] text-gray-700 whitespace-pre-wrap shadow-inner transition duration-150 ease-in-out chat-container">
+                Your AI-generated content will appear here.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const sendBtn = document.getElementById('send-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const promptInput = document.getElementById('prompt-input');
+            const outputArea = document.getElementById('output-area');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const buttonText = document.getElementById('button-text');
+            const aiToolSelect = document.getElementById('ai-tool');
+            const apiKeyInput = document.getElementById('api-key');
+            const chatStatus = document.getElementById('chat-status');
+            
+            const messageContainer = document.getElementById('message-container');
+            
+            let chatHistory = [];
+            const HISTORY_MAX_LENGTH = 6;
+            let lastGeneratedImage = null;
+
+            // Show a temporary message to the user
+            const showMessage = (text, type = 'info') => {
+                const message = document.createElement('div');
+                message.className = `message-box show text-white ${type === 'error' ? 'bg-red-500' : 'bg-green-500'}`;
+                message.textContent = text;
+                messageContainer.appendChild(message);
+
+                setTimeout(() => {
+                    message.classList.remove('show');
+                    setTimeout(() => message.remove(), 500);
+                }, 3000);
+            };
+            
+            const updateOutput = () => {
+                outputArea.innerHTML = '';
+                chatHistory.forEach(message => {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = message.role === 'user' ? 'text-gray-900 font-bold mb-2' : 'text-gray-700 mb-2';
+                    messageElement.textContent = `${message.role.charAt(0).toUpperCase() + message.role.slice(1)}: ${message.text}`;
+                    outputArea.appendChild(messageElement);
+                });
+                outputArea.scrollTop = outputArea.scrollHeight;
+                updateChatStatus();
+            };
+            
+            const updateChatStatus = () => {
+                const totalMessages = chatHistory.length;
+                chatStatus.textContent = `Conversation length: ${totalMessages} messages. (Keeps last ${HISTORY_MAX_LENGTH} for context)`;
+            };
+
+            // Helper function to convert a URL to a base64 string
+            const urlToBase64 = async (url) => {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch image from URL: ${response.status} ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64String = reader.result.split(',')[1];
+                        resolve(base64String);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            };
+
+            // This function handles the API calls
+            const generateContent = async (tool, prompt, apiKey) => {
+                // Set loading state
+                buttonText.textContent = 'Generating...';
+                loadingSpinner.classList.remove('hidden');
+                sendBtn.disabled = true;
+
+                // Add user message to history, but only for text-based chat
+                if (tool === 'gemini' || tool === 'chatgpt') {
+                     chatHistory.push({ role: 'user', text: prompt });
+                     updateOutput();
+                }
+
+                // Get the most recent messages for context
+                const recentHistory = chatHistory.slice(-HISTORY_MAX_LENGTH);
+
+                try {
+                    let response;
+                    let result;
+
+                    if (tool === 'gemini') {
+                         const geminiApiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + apiKey;
+                         const payload = {
+                             contents: recentHistory.map(msg => ({ role: msg.role === 'user' ? 'user' : 'model', parts: [{ text: msg.text }] }))
+                         };
+                         
+                         response = await fetch(geminiApiUrl, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify(payload)
+                         });
+                         if (!response.ok) {
+                            const errorResponseText = await response.text();
+                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
+                         }
+                         result = await response.json();
+                         
+                         if (result.candidates && result.candidates.length > 0) {
+                             const text = result.candidates[0]?.content?.parts[0]?.text || "No response received.";
+                             chatHistory.push({ role: 'model', text: text });
+                         } else {
+                             throw new Error('Invalid response from Gemini API.');
+                         }
+
+                    } else if (tool === 'gemini-image') {
+                        // Clear history for new image generation, as it's a new, separate task
+                        chatHistory = [];
+                        const geminiApiUrl = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`;
+                        const payload = {
+                            instances: {
+                                prompt: prompt
+                            },
+                            parameters: {
+                                sampleCount: 1
+                            }
+                        };
+                        outputArea.innerHTML = ''; // Clear output for new content
+
+                        response = await fetch(geminiApiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) {
+                            const errorResponseText = await response.text();
+                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
+                         }
+                        result = await response.json();
+                        
+                        if (result.predictions && result.predictions.length > 0 && result.predictions[0].bytesBase64Encoded) {
+                            lastGeneratedImage = result.predictions[0].bytesBase64Encoded;
+                            const imageUrl = `data:image/png;base64,${lastGeneratedImage}`;
+                            const img = document.createElement('img');
+                            img.src = imageUrl;
+                            img.alt = prompt;
+                            img.className = "w-full rounded-md shadow-md";
+                            outputArea.appendChild(img);
+                        } else {
+                            throw new Error('No image was returned from the Gemini API.');
+                        }
+                    } else if (tool === 'gemini-image-edit') {
+                        // Clear chat history for image editing
+                        chatHistory = [];
+
+                        if (!lastGeneratedImage) {
+                            showMessage("Please generate an image first using the 'Gemini (Image)' or 'DALL-E' tool.", 'error');
+                            throw new Error("No previous image to edit.");
+                        }
+                        
+                        const geminiEditApiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=" + apiKey;
+                        const payload = {
+                             contents: [
+                                {
+                                    role: "user",
+                                    parts: [
+                                        { text: prompt },
+                                        {
+                                            inlineData: {
+                                                mimeType: "image/png",
+                                                data: lastGeneratedImage
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            generationConfig: {
+                                responseModalities: ['TEXT', 'IMAGE']
+                            },
+                        };
+
+                        outputArea.innerHTML = '';
+                        response = await fetch(geminiEditApiUrl, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify(payload)
+                         });
+
+                         if (!response.ok) {
+                            const errorResponseText = await response.text();
+                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
+                         }
+                         result = await response.json();
+
+                         if (result.candidates && result.candidates.length > 0) {
+                             const imagePart = result.candidates[0]?.content?.parts.find(p => p.inlineData);
+                             if (imagePart && imagePart.inlineData.data) {
+                                 const newImageData = imagePart.inlineData.data;
+                                 lastGeneratedImage = newImageData; // Update the last image for future edits
+                                 const imageUrl = `data:image/png;base64,${newImageData}`;
+                                 const img = document.createElement('img');
+                                 img.src = imageUrl;
+                                 img.alt = prompt;
+                                 img.className = "w-full rounded-md shadow-md";
+                                 outputArea.appendChild(img);
+                             } else {
+                                 throw new Error('No image returned from Gemini Image Edit API.');
+                             }
+                         } else {
+                             throw new Error('Invalid response from Gemini Image Edit API.');
+                         }
+
+                    }
+                    else if (tool === 'chatgpt') {
+                        // ChatGPT uses a similar message format
+                        const chatgptApiUrl = 'https://api.openai.com/v1/chat/completions';
+                        const messages = recentHistory.map(msg => ({ role: msg.role === 'user' ? 'user' : 'assistant', content: msg.text }));
+                        const payload = {
+                            model: "gpt-3.5-turbo",
+                            messages: messages
+                        };
+
+                        response = await fetch(chatgptApiUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) {
+                            const errorResponseText = await response.text();
+                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
+                         }
+                        result = await response.json();
+
+                        if (result.choices && result.choices.length > 0) {
+                            const text = result.choices[0].message.content;
+                            chatHistory.push({ role: 'model', text: text });
+                        } else {
+                            throw new Error('Invalid response from OpenAI.');
+                        }
+
+                    } else if (tool === 'dall-e') {
+                        // Clear history for new image generation, as it's a new, separate task
+                        chatHistory = [];
+                        const dalleApiUrl = 'https://api.openai.com/v1/images/generations';
+                        const payload = {
+                            prompt: prompt,
+                            n: 1,
+                            size: "512x512"
+                        };
+                        outputArea.innerHTML = ''; // Clear output for new content
+
+                        response = await fetch(dalleApiUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${apiKey}`
+                            },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) {
+                            const errorResponseText = await response.text();
+                            throw new Error(`API returned an error: ${response.status} ${response.statusText}. Response body: ${errorResponseText}`);
+                         }
+                        result = await response.json();
+                        
+                        if (result.data && result.data.length > 0) {
+                            const imageUrl = result.data[0].url;
+
+                            // Fetch the image from the URL and convert it to Base64
+                            const base64Image = await urlToBase64(imageUrl);
+                            lastGeneratedImage = base64Image;
+
+                            const img = document.createElement('img');
+                            img.src = `data:image/png;base64,${base64Image}`;
+                            img.alt = prompt;
+                            img.className = "w-full rounded-md shadow-md";
+                            outputArea.appendChild(img);
+                        } else {
+                            throw new Error('Invalid response from DALL-E.');
+                        }
+                    }
+                    
+                    // Update the chat history display after API call
+                    if (tool === 'gemini' || tool === 'chatgpt') {
+                        updateOutput();
+                    }
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    outputArea.textContent = `Error: ${error.message}`;
+                    showMessage(error.message, 'error');
+                    // Remove the user's message if the request fails
+                    if (tool === 'gemini' || tool === 'chatgpt') {
+                        chatHistory.pop();
+                    }
+                } finally {
+                    // Reset loading state
+                    buttonText.textContent = 'Send';
+                    loadingSpinner.classList.add('hidden');
+                    sendBtn.disabled = false;
+                }
+            };
+
+            // Event listener for the generate button
+            sendBtn.addEventListener('click', () => {
+                const prompt = promptInput.value.trim();
+                const selectedTool = aiToolSelect.value;
+                const apiKey = apiKeyInput.value.trim();
+
+                if (prompt === '' && (selectedTool === 'gemini' || selectedTool === 'chatgpt' || selectedTool === 'gemini-image-edit')) {
+                    showMessage('Please enter a prompt.', 'error');
+                    return;
+                }
+                
+                generateContent(selectedTool, prompt, apiKey);
+                promptInput.value = '';
+            });
+
+            // Event listener for the reset button
+            resetBtn.addEventListener('click', () => {
+                chatHistory = [];
+                lastGeneratedImage = null;
+                outputArea.innerHTML = 'Conversation history has been cleared.';
+                showMessage('Conversation reset!', 'info');
+                updateChatStatus();
+            });
+
+            // Initial status update
+            updateChatStatus();
+        });
+    </script>
+
+</body>
+</html>
